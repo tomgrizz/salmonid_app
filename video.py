@@ -13,6 +13,10 @@ logging.basicConfig(filename='video_debug.log', level=logging.DEBUG,
                     format='%(asctime)s - FRAME %(message)s', filemode='w')
 
 
+id2label = {0: 'Chinook', 1: 'Coho', 2: 'Atlantic', 3: 'Rainbow Trout', 4: 'Brown Trout'}
+label2id = {'Chinook': 0, 'Coho': 1, 'Atlantic': 2, 'Rainbow Trout': 3, 'Brown Trout': 4}
+
+
 def process_video(
     video_path,
     model,
@@ -73,7 +77,6 @@ def process_video(
         font = ImageFont.load_default()
 
     objects_detected = {}
-    track_id_list = []
 
     for frame_idx in tqdm(range(total_frames), desc=f"Processing {os.path.basename(video_path)}"):
         ret, frame = cap.read()
@@ -110,35 +113,26 @@ def process_video(
         dets = np.column_stack((boxes, scores, labels))
         res = tracker.update(dets, frame)
 
-        # DEBUG PRINT - IGNORE
-        # if len(res) == 0:
-        #     print(f"No tracks created at frame {frame_idx} with scores: {dets[:, 4]}")
-        # else:
-        #     print(f"Tracks created at frame {frame_idx} with scores: {dets[:, 4]}")
-
         # Update and draw tracked objects
         for track in res:
             # Unpack track data, keeping confidence as a float
             x1, y1, x2, y2, track_id, conf, cls, _ = track
             x1, y1, x2, y2, track_id, cls = int(x1), int(y1), int(x2), int(y2), int(track_id), int(cls)
-            
-            track_id_list.append(track_id)
 
-            if track_id not in objects_detected.keys():
-                track_dict = {}
-                track_dict['first_box'] = [x1, y1, x2, y2]
-                track_dict['cls'] = {cls: conf}
-                track_dict['first_frame'] = frame_idx
-                objects_detected[track_id] = track_dict
+            if track_id in objects_detected.keys():
+                objects_detected[track_id]['boxes'].append([x1, y1, x2, y2])
+                objects_detected[track_id]['classes'].append(cls)
+                objects_detected[track_id]['confs'].append(conf)
+                objects_detected[track_id]['frames'].append(frame_idx)
             else:
-                objects_detected[track_id]['last_frame'] = frame_idx
-                objects_detected[track_id]['last_box'] = [x1, y1, x2, y2]
-                if cls in objects_detected[track_id]['cls'].keys():
-                    objects_detected[track_id]['cls'][cls] += conf
-                else:
-                    objects_detected[track_id]['cls'][cls] = conf
+                objects_detected[track_id] = {}
+                objects_detected[track_id]['boxes'] = [[x1, y1, x2, y2]]
+                objects_detected[track_id]['classes'] = [cls]
+                objects_detected[track_id]['confs'] = [conf]
+                objects_detected[track_id]['frames'] = [frame_idx]
+        
 
-            objects_detected['track_ids'] = set(track_id_list)
+        
             if save_video:
                 draw.rectangle([(x1, y1), (x2, y2)], outline="red", width=2)
                 draw.text((x1, y1 - 20), f"Fish ID: {track_id}", fill="red", font=font)
@@ -162,37 +156,38 @@ def process_video(
             print(f"Saving video to {output_path}")
             for frame in frames:
                 writer.append_data(frame)
+    
 
-    counts = []
-    width = max(pil_image.size)
-    for track_id in objects_detected.get('track_ids', []):
-        id = {}
-        id['id'] = int(track_id)
-        cls_dict = objects_detected[track_id]['cls']
-        cls_idx = int(max(cls_dict, key=lambda k: cls_dict[k]))
-        if id2label is not None:
-            id['cls'] = id2label.get(cls_idx, str(cls_idx))
-        else:
-            id['cls'] = cls_idx
-        first_x1, first_y1, first_x2, first_y2 = [int(x) for x in objects_detected[track_id]['first_box']]
-        last_x1, last_y1, last_x2, last_y2 = [int(x) for x in objects_detected[track_id].get('last_box', objects_detected[track_id]['first_box'])]
+
+    counts = {}
+    for id in objects_detected.keys():
+        first_x1, first_y1, first_x2, first_y2 = [int(x) for x in objects_detected[id]['boxes'][0]]
+        last_x1, last_y1, last_x2, last_y2 = [int(x) for x in objects_detected[id]['boxes'][-1]]
         
-        # If the first frame is less than 5, we don't know what side the fish entered.
-        if objects_detected[track_id]['first_frame'] < 5:
-            id['entrance'] = 'None'
+        # Note entrance sice (if any)
+        if objects_detected[id]['frames'][0] <= 3:
+            counts[id]['entry'] == 'None'
+        elif (first_x1 + first_x2) / 2 < width * 0.5:
+            counts[id]['entry'] = 'Left'
+        elif (first_x1 + first_x2) / 2 > width * 0.5:
+            counts[id]['entry'] = 'Right'
         else:
-            if (first_x1 + first_x2) / 2 < width * 0.5:
-                id['entrance'] = 'left'
-            else:
-                id['entrance'] = 'right'
+            counts[id]['entry'] = 'None'
         
-        # If the last frame is the final frame, we don't know what side the fish exited.
-        if objects_detected[track_id].get('last_frame', 0) == objects_detected['final_frame_for_video']:
-            id['exit'] = 'None'
+        # Note exit side (if any)
+        if objects_detected[id]['frames'][-1] >= objects_detected['final_frame_for_video'] - 3:
+            counts[id]['exit'] = 'None'
+        elif (last_x1 + last_x2) / 2 < width * 0.5:
+            counts[id]['exit'] = 'Left'
+        elif (last_x1 + last_x2) / 2 > width * 0.5:
+            counts[id]['exit'] = 'Right'
         else:
-            if (last_x1 + last_x2) / 2 < width * 0.5:
-                id['exit'] = 'left'
-            else:
-                id['exit'] = 'right'
-        counts.append(id)
-    return counts 
+            counts[id]['exit'] = 'None'
+        
+        # Note class of object
+        counts[id][cls] = id2label[int(np.mean(objects_detected[id]['classes']))]
+
+
+    
+    return counts
+        
