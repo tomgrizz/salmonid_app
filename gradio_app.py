@@ -79,7 +79,7 @@ def evaluate_video_or_zip(input_file, tracker_type, save_annotated_video=True, c
 
         total_videos = len(video_files)
         for idx, video_path in enumerate(video_files):
-            progress(idx / total_videos, desc=f"Processing video {idx+1}/{total_videos}")
+            progress(idx / total_videos, desc=f"Processing video {idx+1}/{total_videos} on device {device}")
             
             cap = cv2.VideoCapture(video_path)
             frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
@@ -98,8 +98,11 @@ def evaluate_video_or_zip(input_file, tracker_type, save_annotated_video=True, c
                 tracker = BotSort(
                     reid_weights=Path("botsort_weights/osnet_x0_25_msmt17.pt"),
                     device=torch.device(device),
-                    track_high_thresh=0.12,
-                    new_track_thresh=0.12,
+                    track_high_thresh=0.4,
+                    track_low_thresh=0.3,
+                    new_track_thresh=0.6,
+                    track_buffer=60,
+                    match_thresh=0.8,
                     half=False,
                     frame_rate=frame_rate
                 )
