@@ -5,16 +5,15 @@ import torch
 import torchvision
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
+from collections import Counter
 import imageio.v2 as imageio
 import logging
+
+
 
 # Set up logging
 logging.basicConfig(filename='video_debug.log', level=logging.DEBUG, 
                     format='%(asctime)s - FRAME %(message)s', filemode='w')
-
-
-id2label = {0: 'Chinook', 1: 'Coho', 2: 'Atlantic', 3: 'Rainbow Trout', 4: 'Brown Trout'}
-label2id = {'Chinook': 0, 'Coho': 1, 'Atlantic': 2, 'Rainbow Trout': 3, 'Brown Trout': 4}
 
 
 def process_video(
@@ -47,6 +46,10 @@ def process_video(
     Returns:
         List of dicts with track info for each detected object.
     """
+
+    id2label = {0: 'Chinook', 1: 'Coho', 2: 'Atlantic', 3: 'Rainbow Trout', 4: 'Brown Trout'}
+    label2id = {'Chinook': 0, 'Coho': 1, 'Atlantic': 2, 'Rainbow Trout': 3, 'Brown Trout': 4}
+
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video file: {video_path}")
@@ -161,12 +164,16 @@ def process_video(
 
     counts = {}
     for id in objects_detected.keys():
+        if id == 'final_frame_for_video':
+            continue
+
+        counts[id] = {}
         first_x1, first_y1, first_x2, first_y2 = [int(x) for x in objects_detected[id]['boxes'][0]]
         last_x1, last_y1, last_x2, last_y2 = [int(x) for x in objects_detected[id]['boxes'][-1]]
         
         # Note entrance sice (if any)
         if objects_detected[id]['frames'][0] <= 3:
-            counts[id]['entry'] == 'None'
+            counts[id]['entry'] = 'None'
         elif (first_x1 + first_x2) / 2 < width * 0.5:
             counts[id]['entry'] = 'Left'
         elif (first_x1 + first_x2) / 2 > width * 0.5:
@@ -185,7 +192,11 @@ def process_video(
             counts[id]['exit'] = 'None'
         
         # Note class of object
-        counts[id][cls] = id2label[int(np.mean(objects_detected[id]['classes']))]
+        class_list = objects_detected[id]['classes']
+        class_counts = Counter(class_list)
+        most_common_class = class_counts.most_common(1)[0][0]
+        
+        counts[id]['Class'] = id2label[most_common_class]
 
 
     
