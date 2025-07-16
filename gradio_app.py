@@ -24,12 +24,26 @@ def load_model(model_dir=None):
         device = f"cuda:{config.cuda_device}" if torch.cuda.is_available() else "cpu"
         model = AutoModelForObjectDetection.from_pretrained(checkpoint).to(device).eval()
         image_processor = AutoImageProcessor.from_pretrained(checkpoint)
+    
+    # Enable GPU optimizations
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+        print(f"Using GPU: {torch.cuda.get_device_name()}")
+        print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+    else:
+        print("Using CPU")
+    
     return model, image_processor, device
 
 # Default model/processor/device
 model, image_processor, device = load_model()
 
 def evaluate_video_or_zip(input_file, tracker_type, save_annotated_video=True, custom_model_zip=None, progress=gr.Progress()):
+    # Clear GPU cache at the start of processing
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
     results = []
     video_outputs = []
     json_outputs = []
@@ -97,7 +111,7 @@ def evaluate_video_or_zip(input_file, tracker_type, save_annotated_video=True, c
             elif tracker_type == 'BotSort':
                 tracker = BotSort(
                     reid_weights=Path("botsort_weights/osnet_x0_25_msmt17.pt"),
-                    device=torch.device(device),
+                    device=torch.device(custom_device),
                     track_high_thresh=0.4,
                     track_low_thresh=0.3,
                     new_track_thresh=0.6,
