@@ -19,7 +19,7 @@ def test_gpu():
     
     if cuda_available:
         # Get CUDA version
-        cuda_version = torch.version.cuda
+        cuda_version = getattr(torch.version, "cuda", None)
         print(f"CUDA version: {cuda_version}")
         
         # Get number of GPUs

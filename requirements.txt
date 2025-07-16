@@ -1,3 +1,7 @@
+# This project is intended for Python 3.12
+# Ensure you are using Python 3.12 for best compatibility
+
+# Core dependencies
 torch>=2.0.0
 transformers>=4.30.0
 datasets>=2.12.0
@@ -6,9 +10,11 @@ torchmetrics>=1.0.0
 numpy<2
 Pillow>=9.5.0
 opencv-python
-boxmot
 tqdm
 supervision
 gradio
 imageio
 imageio-ffmpeg
+
+# Tracking dependencies
+boxmot>=0.3.0

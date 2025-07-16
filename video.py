@@ -1,4 +1,3 @@
-# Replace the entire content of video.py with this:
 
 import os
 import cv2
@@ -333,8 +332,6 @@ def process_video(
             )
         frames = []
 
-    to_pil = torchvision.transforms.ToPILImage()
-
     # Load font
     try:
         font = ImageFont.truetype(font_path, 16)
@@ -436,6 +433,7 @@ def process_video(
         with imageio.get_writer(output_path, fps=fps, codec='libx264') as writer:
             print(f"Saving video to {output_path}")
             for frame in frames:
+                # type: ignore[attr-defined]
                 writer.append_data(frame)
 
     # Process tracking results

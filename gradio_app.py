@@ -12,6 +12,9 @@ from boxmot import ByteTrack, BotSort
 from video import process_video
 from config import TrainingConfig
 
+# NOTE: This app is intended to be run with Python 3.12
+# Ensure 'boxmot' is installed in your environment (pip install boxmot or add to requirements.txt)
+
 def load_model(model_dir=None):
     config = TrainingConfig()
     if model_dir is not None:
@@ -182,7 +185,7 @@ def evaluate_video_or_zip(input_file, tracker_type, save_annotated_video=True, c
         json_download_path = os.path.join(os.path.dirname(json_download_path), json_download_name)
         return (
             json.dumps(results[0]["counts"], indent=2),
-            gr.File(single_zip_path, label="Download Annotated Video and JSON", value=zip_download_name),
+            gr.File(single_zip_path, label="Download Annotated Video and JSON"),
             gr.File(json_download_path, label="Download Results as JSON"),
             video_display
         )
@@ -197,7 +200,7 @@ def evaluate_video_or_zip(input_file, tracker_type, save_annotated_video=True, c
                 zipf.write(j, arcname=jname)
         return (
             json.dumps(results, indent=2),
-            gr.File(zip_path, label="Download All Annotated Videos and JSONs (zip)", value=zip_download_name),
+            gr.File(zip_path, label="Download All Annotated Videos and JSONs (zip)"),
             None,
             video_display
         )
@@ -219,7 +222,7 @@ iface = gr.Interface(
         gr.Textbox(label="Tracking Results (JSON)"),
         gr.File(label="Download Annotated Video(s) and JSON(s)"),
         gr.File(label="Download Results as JSON (single video only)", visible=False),
-        gr.Gallery(label="Annotated Video Gallery", visible=True, type="video")
+        gr.Gallery(label="Annotated Video Gallery", visible=True, type="filepath")
     ],
     title="Salmonid Tracking Video Evaluation",
     description=description,
@@ -227,12 +230,12 @@ iface = gr.Interface(
 )
 
 # Postprocess to show either single video or gallery
-iface.postprocess = lambda outputs: (
-    outputs[0],
-    outputs[1],
-    outputs[2],
-    outputs[3]
-)
+# iface.postprocess = lambda outputs: (
+#     outputs[0],
+#     outputs[1],
+#     outputs[2],
+#     outputs[3]
+# )
 
 if __name__ == "__main__":
     iface.launch(server_name="0.0.0.0", server_port=7860) 
